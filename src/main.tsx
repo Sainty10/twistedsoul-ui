@@ -13,10 +13,9 @@ import {
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 
-// MAINNET ENDPOINT
+// MAINNET endpoint
 const endpoint = clusterApiUrl("mainnet-beta");
 
-// Phantom wallet adapter
 const wallets = [new PhantomWalletAdapter()];
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
