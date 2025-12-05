@@ -11,8 +11,9 @@ type MintResponse = {
   error?: string;
 };
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+// HARD-CODED backend URL (Render)
+// REPLACE this if your Render URL is different
+const API_BASE = "https://twistedsoul-backend.onrender.com";
 
 function App() {
   const { connected, publicKey } = useWallet();
@@ -38,8 +39,9 @@ function App() {
     setMintAddress(null);
     setSignature(null);
 
+    // Show a loud error if wallet not connected
     if (!connected || !publicKey) {
-      setError("Connect your wallet on mainnet first.");
+      setError("Connect your wallet on MAINNET first, then launch again.");
       return;
     }
 
@@ -54,23 +56,38 @@ function App() {
           description,
           twitter,
           telegram,
-          website,
+          website
         },
         bindings: {
           lockLiquidity: true,
           renounceMint: true,
           noGodWallet: true,
-          openSource: true,
-        },
+          openSource: true
+        }
       };
+
+      console.log("Sending mint request to:", `${API_BASE}/api/mint`, body);
 
       const res = await fetch(`${API_BASE}/api/mint`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(body)
       });
 
-      const data: MintResponse = await res.json();
+      const text = await res.text();
+      console.log("Raw response:", text);
+
+      let data: MintResponse;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setError(
+          `Backend returned non-JSON (status ${res.status}). First bytes: ${text
+            .slice(0, 80)
+            .replace(/\s+/g, " ")}`
+        );
+        return;
+      }
 
       if (!data.ok) {
         setError(data.error || "Mint failed.");
@@ -80,14 +97,15 @@ function App() {
       }
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Unknown error during mint.";
+        err instanceof Error ? err.message : "Unknown error during mint (fetch failed).";
       setError(msg);
     } finally {
       setLoading(false);
     }
   }
 
-  const launchDisabled = loading || !connected;
+  // IMPORTANT CHANGE: button is ONLY disabled while loading
+  const launchDisabled = loading;
 
   return (
     <div className="app-root">
@@ -126,6 +144,40 @@ function App() {
           <p className="panel-subtitle">
             Name it. Bind it. Launch it. All rules on-chain, no god wallet.
           </p>
+
+          {/* Big global error block */}
+          {error && (
+            <div
+              style={{
+                marginBottom: 10,
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "rgba(127, 29, 29, 0.9)",
+                border: "1px solid rgba(248, 113, 113, 0.9)",
+                fontSize: 12,
+                color: "#fee2e2"
+              }}
+            >
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
+          {!error && !connected && (
+            <div
+              style={{
+                marginBottom: 10,
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "rgba(30, 64, 175, 0.9)",
+                border: "1px solid rgba(96, 165, 250, 0.9)",
+                fontSize: 12,
+                color: "#dbeafe"
+              }}
+            >
+              Connect your Phantom wallet on <b>mainnet</b> using the button in
+              the top-right, then hit <b>Launch on Chain</b>.
+            </div>
+          )}
 
           <form onSubmit={handleLaunch}>
             <div className="form-grid-2">
@@ -217,13 +269,6 @@ function App() {
             >
               {loading ? "Casting ritual..." : "Launch on Chain"}
             </button>
-
-            {!connected && (
-              <p className="error-text">
-                Connect your wallet on mainnet before launching.
-              </p>
-            )}
-            {error && <p className="error-text">Error: {error}</p>}
           </form>
         </section>
 
