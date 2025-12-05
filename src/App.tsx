@@ -1,5 +1,4 @@
 import "./App.css";
-import type { FormEvent } from "react";
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
@@ -12,7 +11,7 @@ type MintResponse = {
 };
 
 // HARD-CODED backend URL (Render)
-// REPLACE this if your Render URL is different
+// IMPORTANT: if your Render URL is different, replace this string.
 const API_BASE = "https://twistedsoul-backend.onrender.com";
 
 function App() {
@@ -33,13 +32,11 @@ function App() {
   const [signature, setSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleLaunch(e: FormEvent) {
-    e.preventDefault();
+  async function handleLaunchClick() {
     setError(null);
     setMintAddress(null);
     setSignature(null);
 
-    // Show a loud error if wallet not connected
     if (!connected || !publicKey) {
       setError("Connect your wallet on MAINNET first, then launch again.");
       return;
@@ -104,7 +101,6 @@ function App() {
     }
   }
 
-  // IMPORTANT CHANGE: button is ONLY disabled while loading
   const launchDisabled = loading;
 
   return (
@@ -145,7 +141,6 @@ function App() {
             Name it. Bind it. Launch it. All rules on-chain, no god wallet.
           </p>
 
-          {/* Big global error block */}
           {error && (
             <div
               style={{
@@ -179,97 +174,96 @@ function App() {
             </div>
           )}
 
-          <form onSubmit={handleLaunch}>
-            <div className="form-grid-2">
-              <div>
-                <label className="form-label">Token Name</label>
-                <input
-                  className="form-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Twisted Soul"
-                  required
-                />
-              </div>
-              <div>
-                <label className="form-label">Symbol</label>
-                <input
-                  className="form-input"
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                  placeholder="SOUL"
-                  maxLength={8}
-                  required
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <label className="form-label">Total Supply</label>
+          <div className="form-grid-2">
+            <div>
+              <label className="form-label">Token Name</label>
               <input
-                type="number"
-                min="1"
                 className="form-input"
-                value={supply}
-                onChange={(e) => setSupply(e.target.value)}
-                placeholder="1000000000"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Twisted Soul"
                 required
               />
-              <p className="helper-text">
-                Human-readable supply. Factory converts to raw units on-chain.
-              </p>
             </div>
-
-            <div style={{ marginTop: 12 }}>
-              <label className="form-label">Description</label>
-              <textarea
-                className="form-textarea"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What is this soul bound to? Lore, rules, or pure degeneracy."
+            <div>
+              <label className="form-label">Symbol</label>
+              <input
+                className="form-input"
+                value={symbol}
+                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                placeholder="SOUL"
+                maxLength={8}
+                required
               />
             </div>
+          </div>
 
-            <div style={{ marginTop: 12 }} className="form-grid-3">
-              <div>
-                <label className="form-label">Twitter</label>
-                <input
-                  className="form-input"
-                  value={twitter}
-                  onChange={(e) => setTwitter(e.target.value)}
-                  placeholder="@handle or https://"
-                />
-              </div>
-              <div>
-                <label className="form-label">Telegram</label>
-                <input
-                  className="form-input"
-                  value={telegram}
-                  onChange={(e) => setTelegram(e.target.value)}
-                  placeholder="https://t.me/..."
-                />
-              </div>
-              <div>
-                <label className="form-label">Website</label>
-                <input
-                  className="form-input"
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  placeholder="https://"
-                />
-              </div>
+          <div style={{ marginTop: 12 }}>
+            <label className="form-label">Total Supply</label>
+            <input
+              type="number"
+              min="1"
+              className="form-input"
+              value={supply}
+              onChange={(e) => setSupply(e.target.value)}
+              placeholder="1000000000"
+              required
+            />
+            <p className="helper-text">
+              Human-readable supply. Factory converts to raw units on-chain.
+            </p>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label className="form-label">Description</label>
+            <textarea
+              className="form-textarea"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What is this soul bound to? Lore, rules, or pure degeneracy."
+            />
+          </div>
+
+          <div style={{ marginTop: 12 }} className="form-grid-3">
+            <div>
+              <label className="form-label">Twitter</label>
+              <input
+                className="form-input"
+                value={twitter}
+                onChange={(e) => setTwitter(e.target.value)}
+                placeholder="@handle or https://"
+              />
             </div>
+            <div>
+              <label className="form-label">Telegram</label>
+              <input
+                className="form-input"
+                value={telegram}
+                onChange={(e) => setTelegram(e.target.value)}
+                placeholder="https://t.me/..."
+              />
+            </div>
+            <div>
+              <label className="form-label">Website</label>
+              <input
+                className="form-input"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://"
+              />
+            </div>
+          </div>
 
-            <button
-              type="submit"
-              className={
-                "launch-button" + (launchDisabled ? " disabled" : "")
-              }
-              disabled={launchDisabled}
-            >
-              {loading ? "Casting ritual..." : "Launch on Chain"}
-            </button>
-          </form>
+          <button
+            type="button"
+            className={
+              "launch-button" + (launchDisabled ? " disabled" : "")
+            }
+            disabled={launchDisabled}
+            onClick={handleLaunchClick}
+          >
+            {loading ? "Casting ritual..." : "Launch on Chain"}
+          </button>
         </section>
 
         {/* Right: status + anti-rug */}
