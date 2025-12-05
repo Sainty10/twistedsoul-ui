@@ -1,5 +1,5 @@
 import "./App.css";
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
@@ -31,7 +31,7 @@ function App() {
   const [signature, setSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleLaunch(e: React.FormEvent) {
+  async function handleLaunch(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setMintAddress(null);
@@ -86,61 +86,52 @@ function App() {
     }
   }
 
+  const launchDisabled = loading || !connected;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 via-purple-600 to-sky-500 flex items-center justify-center text-xs font-black tracking-widest">
-            SOUL
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold tracking-widest uppercase text-slate-300">
-              Twisted Soul
-            </span>
-            <span className="text-xs text-slate-500">
-              Mainnet Ritual Engine
-            </span>
+    <div className="app-root">
+      <header className="app-header">
+        <div className="app-brand">
+          <div className="app-logo">SOUL</div>
+          <div className="app-title-block">
+            <span className="app-title">Twisted Soul</span>
+            <span className="app-subtitle">Mainnet Ritual Engine</span>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:block text-xs text-slate-400">
-            {connected && publicKey ? (
-              <>
-                <span className="mr-1 text-emerald-400">●</span>
-                {publicKey.toBase58().slice(0, 4)}…
-                {publicKey.toBase58().slice(-4)}
-              </>
-            ) : (
-              <>
-                <span className="mr-1 text-red-500">●</span>
-                Wallet disconnected
-              </>
-            )}
+        <div className="app-header-right">
+          <div className="app-connection-indicator">
+            <span
+              className={
+                "app-connection-dot " +
+                (connected ? "connected" : "disconnected")
+              }
+            />
+            {connected && publicKey
+              ? `${publicKey.toBase58().slice(0, 4)}…${publicKey
+                  .toBase58()
+                  .slice(-4)}`
+              : "Wallet disconnected"}
           </div>
-          <div className="min-w-[200px]">
+          <div style={{ minWidth: 200 }}>
             <WalletMultiButton />
           </div>
         </div>
       </header>
 
-      <main className="flex-1 px-4 sm:px-8 py-6 flex flex-col lg:flex-row gap-6 max-w-6xl w-full mx-auto">
-        {/* Left side: form */}
-        <section className="flex-1 bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-[0_0_80px_rgba(15,23,42,0.9)]">
-          <h2 className="text-lg font-semibold mb-1">
-            Forge a New Soul Token
-          </h2>
-          <p className="text-xs text-slate-500 mb-4">
+      <main className="app-main">
+        {/* Left: form */}
+        <section className="app-panel app-panel--form">
+          <h2 className="panel-title">Forge a New Soul Token</h2>
+          <p className="panel-subtitle">
             Name it. Bind it. Launch it. All rules on-chain, no god wallet.
           </p>
 
-          <form className="space-y-4" onSubmit={handleLaunch}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form onSubmit={handleLaunch}>
+            <div className="form-grid-2">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  Token Name
-                </label>
+                <label className="form-label">Token Name</label>
                 <input
-                  className="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-fuchsia-500/60 focus:border-fuchsia-500/60"
+                  className="form-input"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Twisted Soul"
@@ -148,78 +139,67 @@ function App() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  Symbol
-                </label>
+                <label className="form-label">Symbol</label>
                 <input
-                  className="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-fuchsia-500/60 focus:border-fuchsia-500/60 uppercase"
+                  className="form-input"
                   value={symbol}
                   onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                  placeholder="SOUL"
                   maxLength={8}
                   required
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">
-                Total Supply
-              </label>
+            <div style={{ marginTop: 12 }}>
+              <label className="form-label">Total Supply</label>
               <input
                 type="number"
                 min="1"
-                className="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-fuchsia-500/60 focus:border-fuchsia-500/60"
+                className="form-input"
                 value={supply}
                 onChange={(e) => setSupply(e.target.value)}
                 placeholder="1000000000"
                 required
               />
-              <p className="text-[10px] text-slate-500 mt-1">
+              <p className="helper-text">
                 Human-readable supply. Factory converts to raw units on-chain.
               </p>
             </div>
 
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">
-                Description
-              </label>
+            <div style={{ marginTop: 12 }}>
+              <label className="form-label">Description</label>
               <textarea
-                className="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-fuchsia-500/60 focus:border-fuchsia-500/60 resize-none h-20"
+                className="form-textarea"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="What is this soul bound to? Lore, rules, or pure degeneracy."
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div style={{ marginTop: 12 }} className="form-grid-3">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  Twitter
-                </label>
+                <label className="form-label">Twitter</label>
                 <input
-                  className="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-fuchsia-500/60 focus:border-fuchsia-500/60"
+                  className="form-input"
                   value={twitter}
                   onChange={(e) => setTwitter(e.target.value)}
                   placeholder="@handle or https://"
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  Telegram
-                </label>
+                <label className="form-label">Telegram</label>
                 <input
-                  className="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-fuchsia-500/60 focus:border-fuchsia-500/60"
+                  className="form-input"
                   value={telegram}
                   onChange={(e) => setTelegram(e.target.value)}
                   placeholder="https://t.me/..."
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  Website
-                </label>
+                <label className="form-label">Website</label>
                 <input
-                  className="w-full bg-slate-900/80 border border-slate-700/80 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-fuchsia-500/60 focus:border-fuchsia-500/60"
+                  className="form-input"
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
                   placeholder="https://"
@@ -229,86 +209,80 @@ function App() {
 
             <button
               type="submit"
-              disabled={loading || !connected}
-              className={`mt-2 w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold tracking-wide ${
-                loading || !connected
-                  ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                  : "bg-gradient-to-r from-fuchsia-500 via-purple-600 to-sky-500 hover:from-fuchsia-400 hover:via-purple-500 hover:to-sky-400 text-slate-50 shadow-[0_0_40px_rgba(168,85,247,0.45)]"
-              } transition-all`}
+              className={
+                "launch-button" + (launchDisabled ? " disabled" : "")
+              }
+              disabled={launchDisabled}
             >
               {loading ? "Casting ritual..." : "Launch on Chain"}
             </button>
 
             {!connected && (
-              <p className="mt-2 text-[11px] text-red-400">
+              <p className="error-text">
                 Connect your wallet on mainnet before launching.
               </p>
             )}
+            {error && <p className="error-text">Error: {error}</p>}
           </form>
         </section>
 
-        {/* Right side: status */}
-        <section className="w-full lg:w-[320px] flex flex-col gap-4">
-          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4">
-            <h3 className="text-sm font-semibold mb-1">Ritual Status</h3>
-            <p className="text-xs text-slate-500 mb-3">
+        {/* Right: status + anti-rug */}
+        <section className="app-panel app-panel--status">
+          <div className="app-panel">
+            <h3 className="panel-title">Ritual Status</h3>
+            <p className="panel-subtitle">
               Live feed of what the factory is doing with your token.
             </p>
 
             {loading && (
-              <div className="text-xs text-slate-300">
-                • Sending manifest to Twisted Soul factory…  
+              <div className="status-block">
+                • Sending manifest to Twisted Soul factory…
                 <br />
-                • Binding rules (lock liquidity, renounce mint)…  
+                • Binding rules (lock liquidity, renounce mint)…
                 <br />
                 • Waiting for final confirmation…
               </div>
             )}
 
             {!loading && !mintAddress && !error && (
-              <div className="text-xs text-slate-400">
+              <div className="status-muted">
                 No ritual in progress. Configure your token on the left and hit{" "}
-                <span className="text-fuchsia-400 font-medium">
+                <span style={{ color: "#a855f7", fontWeight: 500 }}>
                   Launch on Chain
                 </span>
                 .
               </div>
             )}
 
-            {error && (
-              <div className="text-xs text-red-400">
-                Error: {error}
-              </div>
-            )}
-
             {mintAddress && (
-              <div className="mt-2 text-xs space-y-1">
-                <div className="text-slate-400">Mint address:</div>
-                <div className="font-mono break-all text-[11px] text-emerald-400">
-                  {mintAddress}
-                </div>
+              <div style={{ marginTop: 10 }}>
+                <div className="status-muted">Mint address:</div>
+                <div className="status-mono status-mint">{mintAddress}</div>
                 {signature && (
                   <>
-                    <div className="mt-2 text-slate-400">Transaction:</div>
-                    <div className="font-mono break-all text-[11px] text-sky-400">
-                      {signature}
+                    <div
+                      className="status-muted"
+                      style={{ marginTop: 8 }}
+                    >
+                      Transaction:
                     </div>
+                    <div className="status-mono status-tx">{signature}</div>
                   </>
                 )}
               </div>
             )}
           </div>
 
-          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400">
-            <div className="font-semibold text-slate-200 mb-1">
-              Binding Rules (Anti-Rug)
+          <div className="app-panel">
+            <div className="rules-title">Binding Rules (Anti-Rug)</div>
+            <div className="rules-body">
+              <ul>
+                <li>Liquidity must be locked on creation.</li>
+                <li>Mint authority is renounced after launch.</li>
+                <li>No oversized dev wallet (“no god wallet”).</li>
+                <li>Factory logic is open-source and auditable.</li>
+              </ul>
             </div>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Liquidity must be locked on creation.</li>
-              <li>Mint authority is renounced after launch.</li>
-              <li>No oversized dev wallet (“no god wallet”).</li>
-              <li>Factory logic is open-source and auditable.</li>
-            </ul>
           </div>
         </section>
       </main>
