@@ -1,25 +1,39 @@
 import "./App.css";
 import { useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
-type MintResponse = {
+import {
+  Keypair,
+  SystemProgram,
+  Transaction,
+  PublicKey
+} from "@solana/web3.js";
+
+import {
+  TOKEN_PROGRAM_ID,
+  MINT_SIZE,
+  getMinimumBalanceForRentExemptMint,
+  getAssociatedTokenAddress,
+  createInitializeMintInstruction,
+  createAssociatedTokenAccountInstruction,
+  createMintToInstruction
+} from "@solana/spl-token";
+
+type MintState = {
   ok: boolean;
   mintAddress?: string;
   signature?: string;
   error?: string;
 };
 
-// HARD-CODED backend URL (Render)
-// IMPORTANT: if your Render URL is different, replace this string.
-const API_BASE = "https://twistedsoul-backend.onrender.com";
-
 function App() {
-  const { connected, publicKey } = useWallet();
+  const { connection } = useConnection();
+  const { connected, publicKey, sendTransaction } = useWallet();
 
-  const [name, setName] = useState("Test Soul");
+  const [name, setName] = useState("Twisted Soul Live");
   const [symbol, setSymbol] = useState("SOUL");
-  const [supply, setSupply] = useState("1000000000");
+  const [supply, setSupply] = useState("1000000000"); // human units
   const [description, setDescription] = useState(
     "Born from the Twisted Soul launchpad."
   );
@@ -28,80 +42,143 @@ function App() {
   const [website, setWebsite] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [mintAddress, setMintAddress] = useState<string | null>(null);
-  const [signature, setSignature] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [mintState, setMintState] = useState<MintState>({ ok: false });
 
   async function handleLaunchClick() {
-    setError(null);
-    setMintAddress(null);
-    setSignature(null);
+    setMintState({ ok: false });
+    if (!connected || !publicKey || !sendTransaction) {
+      setMintState({
+        ok: false,
+        error: "Connect your Phantom wallet on MAINNET first."
+      });
+      return;
+    }
 
-    if (!connected || !publicKey) {
-      setError("Connect your wallet on MAINNET first, then launch again.");
+    // Parse supply safely
+    let supplyBig: bigint;
+    try {
+      supplyBig = BigInt(supply);
+      if (supplyBig <= 0n) {
+        throw new Error("Supply must be positive.");
+      }
+    } catch {
+      setMintState({
+        ok: false,
+        error: "Supply must be a valid positive integer."
+      });
       return;
     }
 
     setLoading(true);
 
     try {
-      const body = {
-        token: {
-          name,
-          symbol,
-          supply,
-          description,
-          twitter,
-          telegram,
-          website
-        },
-        bindings: {
-          lockLiquidity: true,
-          renounceMint: true,
-          noGodWallet: true,
-          openSource: true
-        }
-      };
+      // Fixed 9 decimals (standard SPL)
+      const decimals = 9;
+      const rawAmountBig =
+        supplyBig * (BigInt(10) ** BigInt(decimals)); // convert to raw units
 
-      console.log("Sending mint request to:", `${API_BASE}/api/mint`, body);
-
-      const res = await fetch(`${API_BASE}/api/mint`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-
-      const text = await res.text();
-      console.log("Raw response:", text);
-
-      let data: MintResponse;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        setError(
-          `Backend returned non-JSON (status ${res.status}). First bytes: ${text
-            .slice(0, 80)
-            .replace(/\s+/g, " ")}`
-        );
+      if (rawAmountBig > BigInt(Number.MAX_SAFE_INTEGER)) {
+        setMintState({
+          ok: false,
+          error:
+            "Supply is too large for a single transaction. Use a smaller amount."
+        });
         return;
       }
 
-      if (!data.ok) {
-        setError(data.error || "Mint failed.");
-      } else {
-        if (data.mintAddress) setMintAddress(data.mintAddress);
-        if (data.signature) setSignature(data.signature);
-      }
+      const rawAmount = Number(rawAmountBig);
+
+      // New mint account (keypair lives only in the user's browser)
+      const mintKeypair = Keypair.generate();
+
+      // Rent for mint account
+      const rentLamports = await getMinimumBalanceForRentExemptMint(connection);
+
+      // User's ATA for this mint
+      const owner = publicKey as PublicKey;
+      const ata = await getAssociatedTokenAddress(
+        mintKeypair.publicKey,
+        owner,
+        false,
+        TOKEN_PROGRAM_ID
+      );
+
+      // Build transaction
+      const tx = new Transaction();
+
+      // 1) Create mint account
+      tx.add(
+        SystemProgram.createAccount({
+          fromPubkey: owner,
+          newAccountPubkey: mintKeypair.publicKey,
+          space: MINT_SIZE,
+          lamports: rentLamports,
+          programId: TOKEN_PROGRAM_ID
+        })
+      );
+
+      // 2) Initialize mint (mint authority = user, no freeze authority)
+      tx.add(
+        createInitializeMintInstruction(
+          mintKeypair.publicKey,
+          decimals,
+          owner,
+          null,
+          TOKEN_PROGRAM_ID
+        )
+      );
+
+      // 3) Create associated token account for user
+      tx.add(
+        createAssociatedTokenAccountInstruction(
+          owner, // payer
+          ata, // ATA address
+          owner, // token owner
+          mintKeypair.publicKey, // mint
+          TOKEN_PROGRAM_ID
+        )
+      );
+
+      // 4) Mint tokens to user's ATA
+      tx.add(
+        createMintToInstruction(
+          mintKeypair.publicKey,
+          ata,
+          owner,
+          rawAmount,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      );
+
+      // Send transaction: wallet signs as fee payer, mintKeypair signs as mint account
+      tx.feePayer = owner;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+      const sig = await sendTransaction(tx, connection, {
+        signers: [mintKeypair]
+      });
+
+      // We don’t strictly need to wait for confirmation, but we can:
+      await connection.confirmTransaction(sig, "confirmed");
+
+      setMintState({
+        ok: true,
+        mintAddress: mintKeypair.publicKey.toBase58(),
+        signature: sig
+      });
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Unknown error during mint (fetch failed).";
-      setError(msg);
+        err instanceof Error ? err.message : "Unknown error during mint.";
+      setMintState({ ok: false, error: msg });
     } finally {
       setLoading(false);
     }
   }
 
   const launchDisabled = loading;
+
+  const { ok, mintAddress, signature, error } = mintState;
 
   return (
     <div className="app-root">
@@ -199,7 +276,7 @@ function App() {
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <label className="form-label">Total Supply</label>
+            <label className="form-label">Total Supply (human units)</label>
             <input
               type="number"
               min="1"
@@ -210,7 +287,8 @@ function App() {
               required
             />
             <p className="helper-text">
-              Human-readable supply. Factory converts to raw units on-chain.
+              Tokens are minted with 9 decimals. Actual raw units =
+              supply × 10^9.
             </p>
           </div>
 
@@ -271,16 +349,16 @@ function App() {
           <div className="app-panel">
             <h3 className="panel-title">Ritual Status</h3>
             <p className="panel-subtitle">
-              Live feed of what the factory is doing with your token.
+              Live feed of what the wallet and chain are doing with your token.
             </p>
 
             {loading && (
               <div className="status-block">
-                • Sending manifest to Twisted Soul factory…
+                • Building mint + ATA transaction…
                 <br />
-                • Binding rules (lock liquidity, renounce mint)…
+                • Waiting for Phantom approval…
                 <br />
-                • Waiting for final confirmation…
+                • Confirming on mainnet…
               </div>
             )}
 
@@ -294,7 +372,7 @@ function App() {
               </div>
             )}
 
-            {mintAddress && (
+            {ok && mintAddress && (
               <div style={{ marginTop: 10 }}>
                 <div className="status-muted">Mint address:</div>
                 <div className="status-mono status-mint">{mintAddress}</div>
@@ -314,13 +392,21 @@ function App() {
           </div>
 
           <div className="app-panel">
-            <div className="rules-title">Binding Rules (Anti-Rug)</div>
+            <div className="rules-title">Binding Rules (Current)</div>
             <div className="rules-body">
               <ul>
-                <li>Liquidity must be locked on creation.</li>
-                <li>Mint authority is renounced after launch.</li>
-                <li>No oversized dev wallet (“no god wallet”).</li>
-                <li>Factory logic is open-source and auditable.</li>
+                <li>
+                  Mint authority is your connected wallet (non-custodial).
+                </li>
+                <li>
+                  You control liquidity and future authority changes manually.
+                </li>
+                <li>
+                  No backend wallets, no hot keys on servers.
+                </li>
+                <li>
+                  All risk and control stays with the wallet that signs.
+                </li>
               </ul>
             </div>
           </div>
